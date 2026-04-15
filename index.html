@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIP LAUNCH // ADMIN CONSOLE</title>
+<style>
+  :root {
+    --cp-yellow: #fcee0a;
+    --cp-red: #ff003c;
+    --cp-cyan: #02d9ff;
+    --cp-dark: #050810;
+    --cp-dim: #3a5a6a;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: radial-gradient(ellipse at top, #0a1a28 0%, #050810 60%, #000 100%);
+    color: var(--cp-cyan);
+    font-family: var(--font-mono);
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.22) 3px, rgba(0,0,0,0.22) 4px);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Grid bg */
+  .grid {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(252,238,10,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(252,238,10,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Hazard bars */
+  .hazard {
+    position: fixed; left: 0; right: 0;
+    height: 14px; z-index: 50;
+    background: repeating-linear-gradient(-45deg,
+      var(--cp-yellow) 0 14px, #000 14px 28px);
+  }
+  .hazard.top { top: 0; }
+  .hazard.bottom { bottom: 0; }
+
+  /* Layout */
+  .wrap {
+    position: relative; z-index: 10;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 60px 40px 60px;
+  }
+
+  .brand {
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+  }
+  .brand h1 {
+    font-size: 32px;
+    letter-spacing: 8px;
+    color: var(--cp-yellow);
+    text-shadow: 0 0 20px rgba(252,238,10,0.5);
+    font-weight: 900;
+  }
+  .brand .meta {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--cp-cyan);
+    opacity: 0.7;
+  }
+  .brand .meta .dim { color: var(--cp-dim); }
+
+  .subline {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--cp-yellow);
+    opacity: 0.75;
+    border: 1px solid rgba(252,238,10,0.3);
+    padding: 8px 14px;
+    display: inline-block;
+    margin-bottom: 40px;
+    background: rgba(252,238,10,0.04);
+  }
+
+  /* Grid: form + output */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; gap: 32px; }
+    .brand h1 { font-size: 22px; letter-spacing: 4px; }
+    .wrap { padding: 40px 20px; }
+  }
+
+  /* Panel */
+  .panel {
+    position: relative;
+    background: linear-gradient(180deg, rgba(10,20,32,0.7), rgba(5,8,16,0.9));
+    border: 1px solid rgba(2,217,255,0.25);
+    padding: 28px;
+  }
+  .panel::before {
+    content: "";
+    position: absolute; top: -1px; left: -1px;
+    width: 18px; height: 18px;
+    border-top: 2px solid var(--cp-yellow);
+    border-left: 2px solid var(--cp-yellow);
+  }
+  .panel::after {
+    content: "";
+    position: absolute; bottom: -1px; right: -1px;
+    width: 18px; height: 18px;
+    border-bottom: 2px solid var(--cp-yellow);
+    border-right: 2px solid var(--cp-yellow);
+  }
+
+  .panel h2 {
+    font-size: 12px;
+    letter-spacing: 5px;
+    color: var(--cp-yellow);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(252,238,10,0.25);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel h2::before {
+    content: "▸";
+    color: var(--cp-yellow);
+  }
+
+  /* Form */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--cp-cyan);
+    opacity: 0.8;
+    margin-bottom: 6px;
+  }
+  .field label .req { color: var(--cp-red); margin-left: 4px; }
+  .field .hint {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--cp-dim);
+    margin-top: 4px;
+  }
+
+  .input {
+    width: 100%;
+    background: rgba(5,8,16,0.8);
+    border: 1px solid rgba(2,217,255,0.3);
+    color: var(--cp-yellow);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--cp-yellow);
+    background: rgba(252,238,10,0.05);
+    box-shadow: 0 0 16px rgba(252,238,10,0.25);
+  }
+  .input::placeholder { color: rgba(58,90,106,0.8); letter-spacing: 2px; }
+
+  /* Buttons */
+  .actions {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .btn {
+    background: transparent;
+    border: 1px solid rgba(252,238,10,0.5);
+    color: var(--cp-yellow);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+  }
+  .btn:hover {
+    background: var(--cp-yellow);
+    color: #000;
+    box-shadow: 0 0 20px rgba(252,238,10,0.5);
+  }
+  .btn.primary {
+    background: var(--cp-yellow);
+    color: #000;
+    font-weight: 900;
+  }
+  .btn.primary:hover {
+    background: #fff;
+    box-shadow: 0 0 30px var(--cp-yellow);
+  }
+  .btn.ghost {
+    border-color: rgba(2,217,255,0.4);
+    color: var(--cp-cyan);
+  }
+  .btn.ghost:hover {
+    background: var(--cp-cyan); color: #000;
+    box-shadow: 0 0 20px rgba(2,217,255,0.5);
+  }
+  .btn.danger {
+    border-color: rgba(255,0,60,0.5);
+    color: var(--cp-red);
+  }
+  .btn.danger:hover {
+    background: var(--cp-red);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(255,0,60,0.5);
+  }
+
+  /* Output */
+  .output-box {
+    position: relative;
+    background: #000;
+    border: 1px solid rgba(252,238,10,0.4);
+    padding: 16px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--cp-yellow);
+    word-break: break-all;
+    min-height: 70px;
+    line-height: 1.6;
+    text-shadow: 0 0 6px rgba(252,238,10,0.5);
+    font-family: var(--font-mono);
+  }
+  .output-box.empty {
+    color: var(--cp-dim);
+    text-shadow: none;
+  }
+
+  .output-meta {
+    display: flex; gap: 16px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--cp-cyan);
+    opacity: 0.7;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .output-meta span .dim { color: var(--cp-dim); }
+
+  /* Preview thumb */
+  .thumb {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+    border: 1px solid rgba(2,217,255,0.3);
+    margin-top: 14px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--cp-dim);
+    font-size: 10px;
+    letter-spacing: 3px;
+  }
+  .thumb img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: contrast(1.1) saturate(0.9);
+  }
+  .thumb::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 60%, rgba(5,8,16,0.8));
+    pointer-events: none;
+  }
+
+  /* QR */
+  .qr-box {
+    background: #fff;
+    padding: 12px;
+    display: inline-block;
+    margin-top: 16px;
+    box-shadow: 0 0 30px rgba(252,238,10,0.3);
+  }
+  .qr-box img { display: block; width: 180px; height: 180px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--cp-yellow);
+    color: #000;
+    padding: 12px 24px;
+    font-size: 11px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 200;
+    box-shadow: 0 0 30px rgba(252,238,10,0.5);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .foot {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--cp-dim);
+  }
+  .foot .yellow { color: var(--cp-yellow); }
+</style>
+</head>
+<body>
+
+<div class="grid"></div>
+<div class="hazard top"></div>
+<div class="hazard bottom"></div>
+
+<div class="wrap">
+  <div class="brand">
+    <h1>VIP LAUNCH // ADMIN CONSOLE</h1>
+    <div class="meta">
+      <span class="dim">[ NODE ]</span> kuala-lumpur-01
+      &nbsp;<span class="dim">[ VERSION ]</span> 2.6.1
+      &nbsp;<span class="dim">[ BUILD ]</span> <span id="buildId"></span>
+    </div>
+  </div>
+
+  <div class="subline">CONFIGURE CEREMONY PARAMETERS // GENERATE SHAREABLE LAUNCH URL</div>
+
+  <div class="grid-2">
+
+    <!-- ================ CONFIG PANEL ================ -->
+    <div class="panel">
+      <h2>CEREMONY CONFIGURATION</h2>
+
+      <div class="field">
+        <label>YOUTUBE VIDEO URL <span class="req">*</span></label>
+        <input class="input" id="fVideo" type="text"
+               placeholder="https://www.youtube.com/watch?v=..." />
+        <span class="hint">PASTE FULL URL OR 11-CHAR VIDEO ID. SHORTS &amp; youtu.be SUPPORTED.</span>
+      </div>
+
+      <div class="field">
+        <label>EVENT TITLE</label>
+        <input class="input" id="fTitle" type="text"
+               placeholder="e.g. INTEGRASI 2026 OFFICIAL LAUNCH" />
+        <span class="hint">MAIN HEADING ABOVE SCANNER. DEFAULT: BIOMETRIC LAUNCH SEQUENCE</span>
+      </div>
+
+      <div class="field">
+        <label>EVENT SUBTITLE</label>
+        <input class="input" id="fSubtitle" type="text"
+               placeholder="e.g. MINISTRY OF EDUCATION // MARCH 2026" />
+        <span class="hint">SUB-LINE UNDER MAIN TITLE</span>
+      </div>
+
+      <div class="field">
+        <label>VIP / GUEST OF HONOUR NAME</label>
+        <input class="input" id="fVip" type="text"
+               placeholder="e.g. YB DATO' SRI..." />
+        <span class="hint">SHOWN DRAMATICALLY AFTER &quot;AUTHORIZED&quot;</span>
+      </div>
+
+      <div class="field">
+        <label>EVENT LABEL (CINEMA HUD)</label>
+        <input class="input" id="fEvent" type="text"
+               placeholder="e.g. OFFICIAL LAUNCH CEREMONY" />
+        <span class="hint">TOP-LEFT LABEL DURING PLAYBACK</span>
+      </div>
+
+      <div class="field">
+        <label>ORGANIZATION</label>
+        <input class="input" id="fOrg" type="text"
+               placeholder="e.g. SEKOLAH MENENGAH XYZ" />
+        <span class="hint">BOTTOM-LEFT LABEL DURING PLAYBACK</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="generateBtn">[ GENERATE LAUNCH URL ]</button>
+        <button class="btn ghost" id="resetBtn">[ RESET ]</button>
+      </div>
+    </div>
+
+    <!-- ================ OUTPUT PANEL ================ -->
+    <div class="panel">
+      <h2>DEPLOY &amp; SHARE</h2>
+
+      <div class="field">
+        <label>SHAREABLE LAUNCH URL</label>
+        <div class="output-box empty" id="outputUrl">▸ AWAITING CONFIGURATION...</div>
+        <div class="output-meta">
+          <span><span class="dim">STATUS</span> <span id="statusText">PENDING</span></span>
+          <span><span class="dim">CHARS</span> <span id="charCount">0</span></span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="copyBtn" disabled>[ COPY LAUNCH URL ]</button>
+        <button class="btn ghost" id="copyConfigBtn" disabled>[ COPY CONFIG LINK ]</button>
+        <a class="btn ghost" id="openBtn" target="_blank" rel="noopener" style="display:none">[ OPEN PREVIEW ]</a>
+      </div>
+
+      <div class="field" style="margin-top: 28px;">
+        <label>VIDEO PREVIEW</label>
+        <div class="thumb" id="thumbBox">NO VIDEO LOADED</div>
+      </div>
+
+      <div class="field" id="qrField" style="display:none;">
+        <label>QR CODE // SCAN TO LAUNCH</label>
+        <div class="qr-box"><img id="qrImg" alt="QR" /></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    LAUNCH.OS <span class="yellow">v2.6.1</span> ·
+    <span id="year"></span> ·
+    USE RESPONSIBLY // OFFICIAL CEREMONIES ONLY
+  </div>
+</div>
+
+<div class="toast" id="toast">URL COPIED TO CLIPBOARD</div>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('buildId').textContent = Math.random().toString(16).slice(2,8).toUpperCase();
+
+  // Extract YouTube ID
+  function extractYouTubeId(s) {
+    if (!s) return null;
+    s = s.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+    const m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  const fields = {
+    video:    document.getElementById('fVideo'),
+    title:    document.getElementById('fTitle'),
+    subtitle: document.getElementById('fSubtitle'),
+    vip:      document.getElementById('fVip'),
+    event:    document.getElementById('fEvent'),
+    org:      document.getElementById('fOrg')
+  };
+  const outputUrl = document.getElementById('outputUrl');
+  const statusText = document.getElementById('statusText');
+  const charCount = document.getElementById('charCount');
+  const copyBtn = document.getElementById('copyBtn');
+  const copyConfigBtn = document.getElementById('copyConfigBtn');
+  const openBtn = document.getElementById('openBtn');
+  const thumbBox = document.getElementById('thumbBox');
+  const qrField = document.getElementById('qrField');
+  const qrImg = document.getElementById('qrImg');
+
+  let currentUrl = null;
+
+  function buildUrl() {
+    const videoId = extractYouTubeId(fields.video.value);
+    if (!videoId) return null;
+
+    const qp = new URLSearchParams();
+    qp.set('v', videoId);
+    if (fields.title.value.trim())    qp.set('title',    fields.title.value.trim());
+    if (fields.subtitle.value.trim()) qp.set('subtitle', fields.subtitle.value.trim());
+    if (fields.vip.value.trim())      qp.set('vip',      fields.vip.value.trim());
+    if (fields.event.value.trim())    qp.set('event',    fields.event.value.trim());
+    if (fields.org.value.trim())      qp.set('org',      fields.org.value.trim());
+
+    const base = location.href.replace(/[^/]*$/, '') + 'launch.html';
+    return `${base}?${qp.toString()}`;
+  }
+
+  function updateThumb(videoId) {
+    if (!videoId) {
+      thumbBox.innerHTML = 'NO VIDEO LOADED';
+      return;
+    }
+    thumbBox.innerHTML = `<img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" alt="thumbnail" onerror="this.parentElement.innerHTML='THUMBNAIL UNAVAILABLE'" />`;
+  }
+
+  function updateQR(url) {
+    if (!url) { qrField.style.display = 'none'; return; }
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=2&data=${encodeURIComponent(url)}`;
+    qrField.style.display = 'block';
+  }
+
+  function generate() {
+    const url = buildUrl();
+    const videoId = extractYouTubeId(fields.video.value);
+    updateThumb(videoId);
+
+    if (!url) {
+      outputUrl.classList.add('empty');
+      outputUrl.textContent = '▸ INVALID OR MISSING YOUTUBE URL';
+      statusText.textContent = 'INVALID';
+      statusText.style.color = 'var(--cp-red)';
+      charCount.textContent = '0';
+      copyBtn.disabled = true;
+      copyConfigBtn.disabled = true;
+      openBtn.style.display = 'none';
+      qrField.style.display = 'none';
+      currentUrl = null;
+      return;
+    }
+
+    currentUrl = url;
+    outputUrl.classList.remove('empty');
+    outputUrl.textContent = url;
+    statusText.textContent = 'READY';
+    statusText.style.color = 'var(--cp-yellow)';
+    charCount.textContent = url.length;
+    copyBtn.disabled = false;
+    copyConfigBtn.disabled = false;
+    openBtn.href = url;
+    openBtn.style.display = 'inline-block';
+    updateQR(url);
+  }
+
+  function buildConfigUrl() {
+    if (!currentUrl) return null;
+    const qp = currentUrl.split('?')[1] || '';
+    const base = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '') + 'index.html';
+    return `${base}?${qp}`;
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', generate);
+
+  // Live update on input
+  Object.values(fields).forEach(el => {
+    el.addEventListener('input', () => {
+      if (currentUrl) generate();
+      else updateThumb(extractYouTubeId(fields.video.value));
+    });
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.values(fields).forEach(el => el.value = '');
+    outputUrl.classList.add('empty');
+    outputUrl.textContent = '▸ AWAITING CONFIGURATION...';
+    statusText.textContent = 'PENDING';
+    statusText.style.color = '';
+    charCount.textContent = '0';
+    copyBtn.disabled = true;
+    copyConfigBtn.disabled = true;
+    openBtn.style.display = 'none';
+    qrField.style.display = 'none';
+    thumbBox.innerHTML = 'NO VIDEO LOADED';
+    currentUrl = null;
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    history.replaceState(null, '', location.pathname);
+  });
+
+  // Copy
+  const toast = document.getElementById('toast');
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+  async function copyText(text, label) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(label);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      showToast(label);
+    }
+  }
+  copyBtn.addEventListener('click', () => {
+    if (currentUrl) copyText(currentUrl, 'LAUNCH URL COPIED');
+  });
+  copyConfigBtn.addEventListener('click', () => {
+    const cfg = buildConfigUrl();
+    if (cfg) copyText(cfg, 'CONFIG LINK COPIED');
+  });
+
+  // Restore from URL params (highest priority) then localStorage
+  const STORE_KEY = 'vip-launch-config-v1';
+  (function restore() {
+    const qp = new URLSearchParams(location.search);
+    const paramMap = { v: 'video', title: 'title', subtitle: 'subtitle', vip: 'vip', event: 'event', org: 'org' };
+    let fromParams = false;
+    Object.entries(paramMap).forEach(([qKey, fKey]) => {
+      const val = qp.get(qKey);
+      if (val !== null && fields[fKey]) { fields[fKey].value = val; fromParams = true; }
+    });
+    if (fromParams) {
+      generate();
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      Object.entries(saved).forEach(([k, v]) => {
+        if (fields[k]) fields[k].value = v;
+      });
+      if (saved.video) {
+        updateThumb(extractYouTubeId(saved.video));
+      }
+    } catch (e) {}
+  })();
+  Object.entries(fields).forEach(([k, el]) => {
+    el.addEventListener('input', () => {
+      try {
+        const data = {};
+        Object.entries(fields).forEach(([kk, vv]) => data[kk] = vv.value);
+        localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      } catch (e) {}
+    });
+  });
+</script>
+</body>
+</html>

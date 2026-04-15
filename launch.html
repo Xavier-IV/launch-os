@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIP LAUNCH // BIOMETRIC SCANNER</title>
+<style>
+  :root {
+    --c-bg: #02060a;
+    --c-fg: #c8faff;
+    --c-accent: #00f0ff;
+    --c-accent-hot: #ff2d75;
+    --c-gold: #ffcf3a;
+    --c-dim: #3a5a6a;
+    /* Cyberpunk 2077 palette */
+    --cp-yellow: #fcee0a;
+    --cp-red: #ff003c;
+    --cp-cyan: #02d9ff;
+    --cp-magenta: #ff00a8;
+    --cp-dark: #050810;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, #061622 0%, #02060a 60%, #000 100%);
+    color: var(--c-fg);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Grid background */
+  .grid {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,240,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,240,255,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+    animation: drift 30s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes drift {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 40px 40px, 40px 40px; }
+  }
+
+  /* HUD corners */
+  .hud { position: fixed; font-size: 11px; letter-spacing: 2px; color: var(--c-accent); opacity: 0.7; pointer-events: none; }
+  .hud.tl { top: 20px; left: 20px; }
+  .hud.tr { top: 20px; right: 20px; text-align: right; }
+  .hud.bl { bottom: 20px; left: 20px; }
+  .hud.br { bottom: 20px; right: 20px; text-align: right; }
+  .hud .dim { color: var(--c-dim); }
+  .hud .row { display: block; margin-top: 4px; }
+  .blink { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  /* Stage */
+  .stage {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 30px;
+  }
+
+  .title {
+    text-align: center;
+    letter-spacing: 8px;
+    font-size: 14px;
+    color: var(--c-accent);
+    text-shadow: 0 0 10px rgba(0,240,255,0.6);
+  }
+  .title .sub { display: block; margin-top: 6px; color: var(--c-dim); letter-spacing: 4px; }
+
+  /* Scanner */
+  .scanner-wrap {
+    position: relative;
+    width: min(80vmin, 520px);
+    height: min(80vmin, 520px);
+  }
+
+  .scanner {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .ring {
+    position: absolute; border-radius: 50%;
+    border: 1px solid rgba(0,240,255,0.4);
+    box-shadow: 0 0 30px rgba(0,240,255,0.1) inset, 0 0 20px rgba(0,240,255,0.15);
+  }
+  .ring.r1 { inset: 0; animation: spin 30s linear infinite; border-style: dashed; }
+  .ring.r2 { inset: 8%; animation: spin 20s linear reverse infinite; }
+  .ring.r3 { inset: 18%; border-color: rgba(0,240,255,0.25); animation: spin 40s linear infinite; }
+  .ring.r4 { inset: 28%; border-color: rgba(0,240,255,0.6); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Segmented arc ring */
+  .segments {
+    position: absolute; inset: 0;
+    animation: spin 15s linear infinite;
+    pointer-events: none;
+  }
+  .segments svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .seg { stroke: var(--c-accent); stroke-width: 1.5; fill: none; opacity: 0.85; filter: drop-shadow(0 0 6px var(--c-accent)); }
+
+  /* SVG tick ring */
+  .ticks-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .ticks-svg line { stroke: var(--c-accent); stroke-width: 0.4; opacity: 0.5; }
+  .ticks-svg line.major { stroke-width: 0.6; opacity: 0.9; }
+
+  /* Core (fingerprint zone) */
+  .core {
+    position: relative;
+    width: 44%; height: 44%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(0,240,255,0.15), rgba(0,240,255,0.02) 60%, transparent 80%);
+    border: 2px solid var(--c-accent);
+    box-shadow:
+      0 0 40px rgba(0,240,255,0.4),
+      0 0 80px rgba(0,240,255,0.2),
+      inset 0 0 30px rgba(0,240,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .core.pressing {
+    transform: scale(1.04);
+    box-shadow:
+      0 0 80px rgba(0,240,255,0.7),
+      0 0 160px rgba(0,240,255,0.4),
+      inset 0 0 50px rgba(0,240,255,0.5);
+  }
+
+  /* Fingerprint SVG */
+  .fingerprint {
+    width: 62%; height: 62%;
+    stroke: var(--c-accent);
+    stroke-width: 1.1;
+    fill: none;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 6px var(--c-accent));
+    overflow: visible;
+  }
+
+  /* Scanning line */
+  .scanline {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--c-accent), transparent);
+    box-shadow: 0 0 20px var(--c-accent), 0 0 40px var(--c-accent);
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .core.pressing .scanline { opacity: 1; animation: scan 1.4s ease-in-out infinite; }
+  @keyframes scan {
+    0%   { top: 0%; }
+    50%  { top: 100%; }
+    100% { top: 0%; }
+  }
+
+  /* Progress ring */
+  .progress {
+    position: absolute; inset: 0;
+    transform: rotate(-90deg);
+    pointer-events: none;
+    overflow: visible;
+  }
+  .progress circle {
+    fill: none;
+    stroke-width: 3;
+    cx: 50%; cy: 50%;
+  }
+  .progress .track { stroke: rgba(0,240,255,0.1); }
+  .progress .bar {
+    stroke: var(--c-accent);
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--c-accent));
+    transition: stroke-dashoffset 0.1s linear;
+  }
+
+  .ticks { position: absolute; inset: 0; pointer-events: none; }
+
+  /* Status */
+  .status {
+    text-align: center;
+    letter-spacing: 4px;
+    font-size: 12px;
+    color: var(--c-dim);
+    min-height: 30px;
+  }
+  .status .line1 { display: block; color: var(--c-accent); font-size: 13px; }
+  .status .line2 { display: block; margin-top: 6px; }
+
+  /* Controls */
+  .controls {
+    position: fixed; bottom: 50px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 12px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    z-index: 10;
+  }
+  .btn {
+    background: transparent;
+    color: var(--c-accent);
+    border: 1px solid rgba(0,240,255,0.4);
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: rgba(0,240,255,0.1); border-color: var(--c-accent); box-shadow: 0 0 20px rgba(0,240,255,0.3); }
+  .btn.hot { color: var(--c-accent-hot); border-color: rgba(255,45,117,0.4); }
+  .btn.hot:hover { background: rgba(255,45,117,0.1); box-shadow: 0 0 20px rgba(255,45,117,0.3); }
+  input[type="file"] { display: none; }
+
+  /* =============== CYBERPUNK SEQUENCE =============== */
+  .sequence {
+    position: fixed; inset: 0;
+    background: var(--cp-dark);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    overflow: hidden;
+  }
+  .sequence.active { display: flex; }
+
+  /* CRT scanline + vignette */
+  .sequence::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.25) 4px);
+    pointer-events: none;
+    z-index: 6;
+  }
+  .sequence::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Hazard stripes top/bottom */
+  .hazard {
+    position: absolute; left: 0; right: 0;
+    height: 26px;
+    background: repeating-linear-gradient(-45deg,
+      var(--cp-yellow) 0 22px,
+      #000 22px 44px);
+    z-index: 7;
+    box-shadow: 0 0 20px rgba(252,238,10,0.4);
+  }
+  .hazard.top { top: 0; animation: slide-hazard 2s linear infinite; }
+  .hazard.bottom { bottom: 0; animation: slide-hazard 2s linear infinite reverse; }
+  @keyframes slide-hazard {
+    from { background-position: 0 0; }
+    to   { background-position: 62px 0; }
+  }
+
+  /* Corner brackets */
+  .bracket {
+    position: absolute;
+    width: 80px; height: 80px;
+    border: 3px solid var(--cp-yellow);
+    filter: drop-shadow(0 0 12px var(--cp-yellow));
+    z-index: 8;
+    animation: bracket-in 0.5s ease-out;
+  }
+  @keyframes bracket-in {
+    from { opacity: 0; transform: scale(1.4); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .bracket.tl { top: 50px; left: 40px; border-right: none; border-bottom: none; }
+  .bracket.tr { top: 50px; right: 40px; border-left: none; border-bottom: none; }
+  .bracket.bl { bottom: 50px; left: 40px; border-right: none; border-top: none; }
+  .bracket.br { bottom: 50px; right: 40px; border-left: none; border-top: none; }
+
+  /* Hex matrix cascade */
+  .hex-matrix {
+    position: absolute; inset: 40px;
+    overflow: hidden;
+    z-index: 2;
+    opacity: 0.25;
+  }
+  .hex-col {
+    position: absolute;
+    top: 0;
+    color: var(--cp-yellow);
+    font-size: 12px;
+    line-height: 1.5;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    white-space: nowrap;
+    animation: hex-fall linear infinite;
+    text-shadow: 0 0 6px var(--cp-yellow);
+  }
+  @keyframes hex-fall {
+    from { transform: translateY(-50%); }
+    to   { transform: translateY(100%); }
+  }
+
+  /* Central stage */
+  .seq-content {
+    position: relative;
+    z-index: 9;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+  }
+
+  .cp-label {
+    font-size: 12px;
+    letter-spacing: 8px;
+    color: var(--cp-yellow);
+    opacity: 0.8;
+    padding: 6px 14px;
+    border: 1px solid var(--cp-yellow);
+    text-shadow: 0 0 10px var(--cp-yellow);
+  }
+  .cp-sub {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--cp-yellow);
+    opacity: 0.7;
+  }
+  .cp-sub .dim { color: rgba(252,238,10,0.4); }
+
+  /* Chromatic aberration glitch text */
+  .glitch-text {
+    position: relative;
+    color: var(--cp-yellow);
+    font-family: var(--font-mono);
+    font-weight: 900;
+    text-shadow: 0 0 30px var(--cp-yellow), 0 0 60px rgba(252,238,10,0.6);
+    line-height: 1;
+  }
+  .glitch-text::before,
+  .glitch-text::after {
+    content: attr(data-text);
+    position: absolute; inset: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+  .glitch-text::before {
+    color: var(--cp-red);
+    text-shadow: 0 0 20px var(--cp-red);
+    animation: glitch-r 0.25s steps(3) infinite;
+  }
+  .glitch-text::after {
+    color: var(--cp-cyan);
+    text-shadow: 0 0 20px var(--cp-cyan);
+    animation: glitch-c 0.22s steps(3) infinite;
+  }
+  @keyframes glitch-r {
+    0%   { transform: translate(0,0); clip-path: inset(0 0 0 0); }
+    25%  { transform: translate(-4px, 1px); clip-path: inset(10% 0 30% 0); }
+    50%  { transform: translate(3px, -2px); clip-path: inset(60% 0 5% 0); }
+    75%  { transform: translate(-2px, 2px); clip-path: inset(30% 0 50% 0); }
+    100% { transform: translate(0,0); clip-path: inset(0 0 0 0); }
+  }
+  @keyframes glitch-c {
+    0%   { transform: translate(0,0); }
+    25%  { transform: translate(4px, -1px); }
+    50%  { transform: translate(-3px, 2px); }
+    75%  { transform: translate(2px, 1px); }
+    100% { transform: translate(0,0); }
+  }
+
+  .countdown {
+    font-size: 28vmin;
+    font-weight: 900;
+    animation: cd-slam 1s cubic-bezier(.2,.9,.2,1);
+  }
+  @keyframes cd-slam {
+    0%   { transform: scale(2.4) skewX(-15deg); opacity: 0; filter: blur(20px); }
+    30%  { transform: scale(1) skewX(0deg); opacity: 1; filter: blur(0); }
+    70%  { transform: scale(1) skewX(0deg); opacity: 1; }
+    100% { transform: scale(1.15) skewX(5deg); opacity: 0; filter: blur(8px); }
+  }
+
+  .launch-text {
+    font-size: 10vmin;
+    letter-spacing: 14px;
+    font-weight: 900;
+    animation: launch-in 0.8s cubic-bezier(.1,.9,.2,1);
+  }
+  @keyframes launch-in {
+    0%   { opacity: 0; transform: scaleX(0.3); letter-spacing: 80px; filter: blur(30px); }
+    60%  { opacity: 1; transform: scaleX(1.05); letter-spacing: 14px; filter: blur(0); }
+    100% { opacity: 1; transform: scaleX(1); letter-spacing: 14px; }
+  }
+
+  .access-text {
+    font-size: 8vmin;
+    letter-spacing: 18px;
+    font-weight: 900;
+    animation: access-in 0.8s ease-out;
+  }
+  @keyframes access-in {
+    0%   { opacity: 0; transform: translateY(-20px); clip-path: inset(0 100% 0 0); }
+    100% { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+  }
+
+  /* Side diagnostic strip */
+  .diag-strip {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    color: var(--cp-yellow);
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 1.6;
+    opacity: 0.7;
+    z-index: 8;
+    white-space: pre;
+  }
+  .diag-strip.left { left: 60px; text-align: left; }
+  .diag-strip.right { right: 60px; text-align: right; }
+
+  /* =============== CYBERPUNK CINEMA =============== */
+  .cinema {
+    position: fixed; inset: 0;
+    background: var(--cp-dark);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 200;
+    overflow: hidden;
+  }
+  .cinema.active { display: flex; animation: cinema-in 0.6s ease-out; }
+  @keyframes cinema-in { from { opacity: 0; filter: blur(20px); } to { opacity: 1; filter: blur(0); } }
+
+  .cinema .yt-wrap {
+    position: relative;
+    width: calc(100% - 240px);
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    max-height: calc(100% - 140px);
+    box-shadow:
+      0 0 60px rgba(252,238,10,0.25),
+      0 0 120px rgba(2,217,255,0.15);
+    clip-path: polygon(0 10px, 10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px));
+    background: #000;
+    overflow: hidden;
+  }
+  .cinema .yt-wrap iframe {
+    width: 100%; height: 100%;
+    border: 0; display: block;
+    pointer-events: none;
+  }
+  /* Block pointer events & hide YT UI elements that leak through (logo, title, watermark) */
+  .cinema .yt-wrap::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: auto;
+    z-index: 2;
+  }
+  .yt-mask {
+    position: absolute;
+    background: #000;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .yt-mask.br { right: 0; bottom: 0; width: 96px; height: 40px; }
+  .yt-mask.tr { right: 0; top: 0; width: 200px; height: 56px; opacity: 0; transition: opacity 0.2s; }
+  .cinema .yt-wrap:hover .yt-mask.tr { opacity: 1; }
+  /* Top bar mask - covers YouTube's title overlay on start */
+  .yt-mask.top {
+    left: 0; right: 0; top: 0;
+    height: 80px;
+    background: linear-gradient(180deg, #000 60%, rgba(0,0,0,0.0));
+    opacity: 1;
+    transition: opacity 1.2s ease;
+  }
+  .yt-wrap.reveal .yt-mask.top { opacity: 0; }
+
+  /* CRT overlay on video */
+  .cinema::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .cinema-bars {
+    position: absolute; left: 0; right: 0;
+    height: 28px;
+    z-index: 2;
+    pointer-events: none;
+    background: repeating-linear-gradient(-45deg,
+      var(--cp-yellow) 0 22px,
+      #000 22px 44px);
+    box-shadow: 0 0 20px rgba(252,238,10,0.4);
+  }
+  .cinema-bars.top { top: 0; animation: slide-hazard 2s linear infinite; }
+  .cinema-bars.bottom { bottom: 0; animation: slide-hazard 2s linear infinite reverse; }
+
+  .cinema-hud {
+    position: absolute;
+    color: var(--cp-yellow);
+    font-size: 11px;
+    letter-spacing: 3px;
+    opacity: 0.85;
+    z-index: 3;
+    text-shadow: 0 0 8px rgba(252,238,10,0.6);
+    padding: 4px 8px;
+    border: 1px solid rgba(252,238,10,0.3);
+    background: rgba(5,8,16,0.6);
+    backdrop-filter: blur(4px);
+  }
+  .cinema-hud.tl { top: 42px; left: 30px; }
+  .cinema-hud.tr { top: 42px; right: 30px; }
+  .cinema-hud.bl { bottom: 42px; left: 30px; }
+  .cinema-hud.br { bottom: 42px; right: 30px; }
+
+  /* Cinema corner brackets */
+  .cinema-bracket {
+    position: absolute;
+    width: 60px; height: 60px;
+    border: 2px solid var(--cp-yellow);
+    filter: drop-shadow(0 0 10px var(--cp-yellow));
+    z-index: 4;
+    pointer-events: none;
+  }
+  .cinema-bracket.tl { top: 42px; left: 120px; border-right: none; border-bottom: none; }
+  .cinema-bracket.tr { top: 42px; right: 120px; border-left: none; border-bottom: none; }
+  .cinema-bracket.bl { bottom: 42px; left: 120px; border-right: none; border-top: none; }
+  .cinema-bracket.br { bottom: 42px; right: 120px; border-left: none; border-top: none; }
+
+  .cinema-close {
+    position: absolute; top: 44px; right: 30px;
+    z-index: 10;
+    background: var(--cp-yellow) !important;
+    color: #000 !important;
+    border-color: var(--cp-yellow) !important;
+    font-weight: 700;
+  }
+  .cinema-close:hover {
+    background: var(--cp-red) !important;
+    border-color: var(--cp-red) !important;
+    color: var(--cp-yellow) !important;
+    box-shadow: 0 0 20px var(--cp-red) !important;
+  }
+
+  /* Flash */
+  .flash {
+    position: fixed; inset: 0;
+    background: var(--c-accent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 500;
+  }
+  .flash.on { animation: flash 0.4s ease-out; }
+  @keyframes flash {
+    0%   { opacity: 0; }
+    20%  { opacity: 0.9; }
+    100% { opacity: 0; }
+  }
+
+  /* Glitch */
+  .glitch {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 400;
+    opacity: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,240,255,0.05) 2px, rgba(0,240,255,0.05) 4px);
+    mix-blend-mode: screen;
+  }
+  .glitch.on { animation: glitch-anim 0.4s steps(6) 3; }
+  @keyframes glitch-anim {
+    0%,100% { opacity: 0; transform: translate(0); }
+    50%    { opacity: 1; transform: translate(4px, -2px); }
+  }
+
+  /* Particles */
+  .particles {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .particle {
+    position: absolute;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--c-accent);
+    box-shadow: 0 0 6px var(--c-accent);
+    opacity: 0;
+  }
+
+  /* Drop zone */
+  .drop-hint {
+    position: fixed; bottom: 110px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--c-dim);
+    pointer-events: none;
+  }
+
+  body.dragging::after {
+    content: "DROP MEDIA TO LOAD";
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,240,255,0.08);
+    border: 2px dashed var(--c-accent);
+    color: var(--c-accent);
+    font-size: 24px;
+    letter-spacing: 8px;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  /* Fullscreen prompt */
+  .fs-prompt {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 600;
+    background: linear-gradient(180deg, rgba(10,20,32,0.95), rgba(5,8,16,0.98));
+    border: 2px solid var(--cp-yellow);
+    box-shadow:
+      0 0 40px rgba(252,238,10,0.5),
+      0 0 80px rgba(252,238,10,0.2),
+      inset 0 0 30px rgba(252,238,10,0.05);
+    padding: 40px 50px;
+    text-align: center;
+    display: none;
+    min-width: 380px;
+    max-width: 90vw;
+  }
+  .fs-prompt.show { display: block; animation: fs-in 0.4s cubic-bezier(.2,.9,.2,1); }
+  @keyframes fs-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .fs-prompt .fs-label {
+    font-size: 11px;
+    letter-spacing: 5px;
+    color: var(--cp-yellow);
+    opacity: 0.75;
+    margin-bottom: 14px;
+  }
+  .fs-prompt .fs-title {
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: var(--cp-yellow);
+    font-weight: 900;
+    margin-bottom: 10px;
+    text-shadow: 0 0 16px rgba(252,238,10,0.5);
+  }
+  .fs-prompt .fs-hint {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--c-accent);
+    opacity: 0.7;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+  .fs-prompt .fs-actions {
+    display: flex; gap: 10px; justify-content: center;
+  }
+  .fs-prompt .fs-btn-primary {
+    background: var(--cp-yellow);
+    color: #000;
+    border: 2px solid var(--cp-yellow);
+    padding: 14px 28px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 4px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fs-prompt .fs-btn-primary:hover {
+    background: #fff;
+    box-shadow: 0 0 30px var(--cp-yellow);
+  }
+  .fs-prompt .fs-btn-skip {
+    background: transparent;
+    color: var(--c-dim);
+    border: 1px solid rgba(58,90,106,0.4);
+    padding: 14px 20px;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fs-prompt .fs-btn-skip:hover {
+    color: var(--c-fg);
+    border-color: var(--c-accent);
+  }
+  .fs-prompt .fs-bracket {
+    position: absolute;
+    width: 18px; height: 18px;
+  }
+  .fs-prompt .fs-bracket.tl { top: -2px; left: -2px; border-top: 2px solid var(--cp-yellow); border-left: 2px solid var(--cp-yellow); }
+  .fs-prompt .fs-bracket.tr { top: -2px; right: -2px; border-top: 2px solid var(--cp-yellow); border-right: 2px solid var(--cp-yellow); }
+  .fs-prompt .fs-bracket.bl { bottom: -2px; left: -2px; border-bottom: 2px solid var(--cp-yellow); border-left: 2px solid var(--cp-yellow); }
+  .fs-prompt .fs-bracket.br { bottom: -2px; right: -2px; border-bottom: 2px solid var(--cp-yellow); border-right: 2px solid var(--cp-yellow); }
+
+  /* Fullscreen toggle button */
+  .fs-toggle {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    z-index: 550;
+    background: rgba(5,8,16,0.7);
+    border: 1px solid rgba(252,238,10,0.4);
+    color: var(--cp-yellow);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .fs-toggle:hover {
+    background: var(--cp-yellow);
+    color: #000;
+    box-shadow: 0 0 16px rgba(252,238,10,0.4);
+  }
+  .fs-toggle .ico { font-size: 12px; line-height: 1; }
+
+  /* When fullscreen: hide bottom controls, compact toggle to X at top-right */
+  body.is-fullscreen .controls { display: none; }
+  body.is-fullscreen .drop-hint { display: none; }
+  body.is-fullscreen .fs-toggle {
+    top: 16px; right: 16px;
+    bottom: auto;
+    width: 34px; height: 34px;
+    padding: 0;
+    justify-content: center;
+    font-size: 16px;
+    letter-spacing: 0;
+    border-radius: 2px;
+  }
+  body.is-fullscreen .fs-toggle .ico { display: none; }
+  body.is-fullscreen .fs-toggle .label { display: none; }
+  body.is-fullscreen .fs-toggle::before {
+    content: "✕";
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  @media (max-width: 600px) {
+    .title { font-size: 11px; letter-spacing: 4px; }
+    .hud { font-size: 9px; letter-spacing: 1px; }
+    .controls { flex-direction: column; bottom: 20px; }
+    .drop-hint { display: none; }
+    .fs-prompt { padding: 28px 24px; min-width: 0; width: 90vw; }
+    .fs-prompt .fs-title { font-size: 16px; letter-spacing: 2px; }
+    .fs-prompt .fs-actions { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grid"></div>
+
+<div class="hud tl">
+  <span class="dim">[ SYSTEM ]</span> LAUNCH.OS v2.6.1
+  <span class="row"><span class="dim">[ NODE ]</span> kuala-lumpur-01</span>
+  <span class="row"><span class="dim">[ CLEARANCE ]</span> <span style="color:var(--c-gold)">TIER-9 / VIP</span></span>
+</div>
+
+<div class="hud tr">
+  <span id="clock">--:--:--</span>
+  <span class="row"><span class="dim">LAT</span> 3.1390° N</span>
+  <span class="row"><span class="dim">LON</span> 101.6869° E</span>
+</div>
+
+<div class="hud bl">
+  <span class="blink" style="color:var(--c-accent-hot)">● REC</span>
+  <span class="row"><span class="dim">CHANNEL</span> AUX-07</span>
+</div>
+
+<div class="hud br">
+  <span class="dim">UPLINK</span> <span style="color:#5efc82">STABLE</span>
+  <span class="row"><span class="dim">ENCRYPTION</span> AES-512</span>
+  <span class="row"><span class="dim">SIG</span> <span id="sig">-47dBm</span></span>
+</div>
+
+<div class="stage">
+  <div class="title">
+    BIOMETRIC LAUNCH SEQUENCE
+    <span class="sub">AUTHORIZED PERSONNEL ONLY</span>
+  </div>
+
+  <div class="scanner-wrap">
+    <div class="scanner" id="scanner">
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+      <div class="ring r3"></div>
+
+      <div class="segments">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+          <path class="seg" d="M 56.94 10.61 A 40 40 0 0 1 87.59 63.68" />
+          <path class="seg" d="M 80.64 75.71 A 40 40 0 0 1 19.36 75.71" />
+          <path class="seg" d="M 12.41 63.68 A 40 40 0 0 1 43.06 10.61" />
+        </svg>
+      </div>
+
+      <svg class="ticks-svg" id="ticksSvg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+
+      <svg class="progress" viewBox="0 0 100 100">
+        <circle class="track" cx="50" cy="50" r="47" />
+        <circle class="bar" id="progBar" cx="50" cy="50" r="47"
+                stroke-dasharray="295.3" stroke-dashoffset="295.3" />
+      </svg>
+
+      <div class="core" id="core">
+        <svg class="fingerprint" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7.864 4.243A7.5 7.5 0 0 1 19.5 10.5c0 2.92-.556 5.709-1.568 8.268" />
+          <path d="M5.742 6.364A7.465 7.465 0 0 0 4.5 10.5a7.464 7.464 0 0 1-1.15 3.993" />
+          <path d="M5.339 18.052A11.209 11.209 0 0 0 8.25 10.5a3.75 3.75 0 1 1 7.5 0c0 .527-.021 1.049-.064 1.565" />
+          <path d="M12 10.5a14.94 14.94 0 0 1-3.6 9.75" />
+          <path d="M15.033 15.654a18.666 18.666 0 0 1-2.485 5.33" />
+        </svg>
+        <div class="scanline"></div>
+        <div class="particles" id="particles"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span class="line1" id="statusLine1">PLACE INDEX FINGER ON SCANNER</span>
+    <span class="line2" id="statusLine2">HOLD STEADY FOR 3.0s TO INITIATE</span>
+  </div>
+</div>
+
+<div class="controls">
+  <a class="btn" id="configBtn" href="index.html">[ CONFIGURE ]</a>
+  <button class="btn hot" id="abortBtn">[ ABORT ]</button>
+</div>
+
+<div class="fs-prompt" id="fsPrompt" role="dialog" aria-modal="true">
+  <div class="fs-bracket tl"></div>
+  <div class="fs-bracket tr"></div>
+  <div class="fs-bracket bl"></div>
+  <div class="fs-bracket br"></div>
+  <div class="fs-label">▸ RECOMMENDED ◂</div>
+  <div class="fs-title">ENTER FULL SCREEN</div>
+  <div class="fs-hint">FOR BEST VIEWING EXPERIENCE<br>PRESENT THIS CEREMONY IN FULL SCREEN MODE</div>
+  <div class="fs-actions">
+    <button class="fs-btn-primary" id="fsEnterBtn">[ ENTER FULL SCREEN ]</button>
+    <button class="fs-btn-skip" id="fsSkipBtn">[ SKIP ]</button>
+  </div>
+</div>
+
+<button class="fs-toggle" id="fsToggle" title="Toggle Fullscreen (F)"><span class="ico">⛶</span><span class="label" id="fsToggleLabel">FULL SCREEN</span></button>
+
+<div class="flash" id="flash"></div>
+<div class="glitch" id="glitchEl"></div>
+
+<div class="sequence" id="sequence">
+  <div class="hazard top"></div>
+  <div class="hazard bottom"></div>
+  <div class="bracket tl"></div>
+  <div class="bracket tr"></div>
+  <div class="bracket bl"></div>
+  <div class="bracket br"></div>
+  <div class="hex-matrix" id="hexMatrix"></div>
+  <div class="diag-strip left" id="diagLeft"></div>
+  <div class="diag-strip right" id="diagRight"></div>
+  <div class="seq-content" id="seqContent"></div>
+</div>
+
+<div class="cinema" id="cinema">
+  <div class="cinema-bars top"></div>
+  <div class="cinema-bars bottom"></div>
+  <div class="cinema-bracket tl"></div>
+  <div class="cinema-bracket tr"></div>
+  <div class="cinema-bracket bl"></div>
+  <div class="cinema-bracket br"></div>
+  <div class="cinema-hud tl" id="cinemaHudTL">◉ SECURE BROADCAST // LIVE</div>
+  <div class="cinema-hud tr">REC <span class="blink" style="color:var(--cp-red)">●</span> 4K.UHD</div>
+  <div class="cinema-hud bl" id="cinemaHudBL">LAUNCH.OS v2.6.1</div>
+  <div class="cinema-hud br">T+<span id="cinemaTime">00:00</span></div>
+  <button class="btn cinema-close" id="closeCinema">[ END BROADCAST ]</button>
+  <div class="yt-wrap" id="ytWrap">
+    <div id="player"></div>
+    <div class="yt-mask top"></div>
+    <div class="yt-mask br"></div>
+    <div class="yt-mask tr"></div>
+  </div>
+</div>
+
+<script>
+  // Ticks around scanner (SVG, scales with viewBox)
+  const ticksSvg = document.getElementById('ticksSvg');
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const CX = 50, CY = 50;
+  const R_OUTER = 49;
+  for (let i = 0; i < 60; i++) {
+    const major = i % 5 === 0;
+    const len = major ? 3.5 : 1.6;
+    const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+    const x1 = CX + Math.cos(angle) * R_OUTER;
+    const y1 = CY + Math.sin(angle) * R_OUTER;
+    const x2 = CX + Math.cos(angle) * (R_OUTER - len);
+    const y2 = CY + Math.sin(angle) * (R_OUTER - len);
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    if (major) line.setAttribute('class', 'major');
+    ticksSvg.appendChild(line);
+  }
+
+  // Clock
+  const clockEl = document.getElementById('clock');
+  const sigEl = document.getElementById('sig');
+  function tick() {
+    const d = new Date();
+    clockEl.textContent = d.toTimeString().slice(0,8) + ' MYT';
+    sigEl.textContent = `-${40 + Math.floor(Math.random()*15)}dBm`;
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Audio disabled - YouTube video provides its own sound
+  function ensureAudio() {}
+  function beep() {}
+  function swoosh() {}
+  function boom() {}
+
+  // Particles inside core
+  const particlesEl = document.getElementById('particles');
+  function spawnParticle() {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const startX = 50 + (Math.random() * 30 - 15);
+    const startY = 100;
+    const endX = 50 + (Math.random() * 60 - 30);
+    const endY = -10;
+    const dur = 1200 + Math.random() * 1000;
+    p.style.left = startX + '%';
+    p.style.top = startY + '%';
+    particlesEl.appendChild(p);
+    p.animate([
+      { opacity: 0, top: startY + '%', left: startX + '%' },
+      { opacity: 1, offset: 0.2 },
+      { opacity: 0, top: endY + '%', left: endX + '%' }
+    ], { duration: dur, easing: 'ease-out' });
+    setTimeout(() => p.remove(), dur);
+  }
+  let particleTimer = null;
+  function startParticles() {
+    if (particleTimer) return;
+    particleTimer = setInterval(spawnParticle, 80);
+  }
+  function stopParticles() {
+    clearInterval(particleTimer);
+    particleTimer = null;
+  }
+
+  // Scanner logic
+  const core = document.getElementById('core');
+  const scanner = document.getElementById('scanner');
+  const progBar = document.getElementById('progBar');
+  const statusLine1 = document.getElementById('statusLine1');
+  const statusLine2 = document.getElementById('statusLine2');
+  const CIRC = 295.3; // 2*pi*47
+  const HOLD_MS = 3000;
+
+  let holdStart = null;
+  let rafId = null;
+  let launching = false;
+  let heldTime = 0;
+  const scanMessages = [
+    ['SCANNING RIDGE PATTERNS', 'MINUTIAE MAPPING...'],
+    ['VERIFYING VASCULAR GRID', 'CROSS-REFERENCE DB...'],
+    ['CORRELATING IDENTITY', 'CLEARANCE CHECK...'],
+    ['AUTHORIZATION GRANTED', 'STANDBY FOR LAUNCH']
+  ];
+
+  function pressStart(e) {
+    if (launching) return;
+    e.preventDefault();
+    ensureAudio();
+    core.classList.add('pressing');
+    startParticles();
+    holdStart = performance.now();
+    beep(660, 0.06, 'square', 0.05);
+    loop();
+  }
+
+  function pressEnd() {
+    if (launching) return;
+    core.classList.remove('pressing');
+    stopParticles();
+    cancelAnimationFrame(rafId);
+    progBar.style.strokeDashoffset = CIRC;
+    holdStart = null;
+    heldTime = 0;
+    statusLine1.textContent = 'PLACE INDEX FINGER ON SCANNER';
+    statusLine2.textContent = 'HOLD STEADY FOR 3.0s TO INITIATE';
+    beep(220, 0.12, 'sawtooth', 0.05);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const elapsed = now - holdStart;
+    heldTime = Math.min(elapsed, HOLD_MS);
+    const pct = heldTime / HOLD_MS;
+    progBar.style.strokeDashoffset = CIRC * (1 - pct);
+
+    const msgIdx = Math.min(scanMessages.length - 1, Math.floor(pct * scanMessages.length));
+    statusLine1.textContent = scanMessages[msgIdx][0];
+    const remaining = Math.max(0, (HOLD_MS - heldTime) / 1000);
+    statusLine2.textContent = remaining > 0.1
+      ? `${scanMessages[msgIdx][1]} ${remaining.toFixed(1)}s`
+      : scanMessages[msgIdx][1];
+
+    // Occasional beep
+    if (Math.floor(elapsed / 300) !== Math.floor((elapsed - 16) / 300)) {
+      beep(440 + pct * 440, 0.04, 'square', 0.03);
+    }
+
+    if (heldTime >= HOLD_MS) {
+      triggerLaunch();
+    } else {
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
+  scanner.addEventListener('mousedown', pressStart);
+  scanner.addEventListener('touchstart', pressStart, { passive: false });
+  window.addEventListener('mouseup', pressEnd);
+  window.addEventListener('touchend', pressEnd);
+  window.addEventListener('touchcancel', pressEnd);
+  scanner.addEventListener('mouseleave', (e) => { if (holdStart) pressEnd(); });
+
+  // Launch sequence
+  const flash = document.getElementById('flash');
+  const glitchEl = document.getElementById('glitchEl');
+  const sequence = document.getElementById('sequence');
+  const seqContent = document.getElementById('seqContent');
+  const cinema = document.getElementById('cinema');
+  const video = document.getElementById('video');
+
+  function triggerLaunch() {
+    launching = true;
+    cancelAnimationFrame(rafId);
+    stopParticles();
+    core.classList.remove('pressing');
+
+    // Flash
+    flash.classList.add('on');
+    setTimeout(() => flash.classList.remove('on'), 400);
+    boom();
+    swoosh(200, 1400, 1.0, 0.1);
+
+    setTimeout(runSequence, 250);
+  }
+
+  // Hex matrix generator
+  const hexMatrix = document.getElementById('hexMatrix');
+  const diagLeft = document.getElementById('diagLeft');
+  const diagRight = document.getElementById('diagRight');
+  const HEX_CHARS = '0123456789ABCDEF';
+  function randHex(n) { let s = ''; for (let i = 0; i < n; i++) s += HEX_CHARS[Math.floor(Math.random()*16)]; return s; }
+  function buildHexMatrix() {
+    hexMatrix.innerHTML = '';
+    const cols = Math.floor(window.innerWidth / 24);
+    for (let i = 0; i < cols; i++) {
+      const col = document.createElement('div');
+      col.className = 'hex-col';
+      col.style.left = (i * 24) + 'px';
+      col.style.animationDuration = (3 + Math.random() * 5) + 's';
+      col.style.animationDelay = (-Math.random() * 5) + 's';
+      let s = '';
+      for (let j = 0; j < 18; j++) s += randHex(2) + '\n';
+      col.textContent = s;
+      hexMatrix.appendChild(col);
+    }
+  }
+  function buildDiag() {
+    const lines = [
+      ['OPERATOR', 'ONLINE'],
+      ['SECURITY', 'AES-512'],
+      ['SESSION', randHex(4)],
+      ['CHANNEL', 'AUX-07'],
+      ['LATENCY', (12+Math.floor(Math.random()*40)) + 'ms'],
+      ['UPTIME', '99.99%'],
+      ['PROTOCOL', 'ZFS/2.6'],
+      ['LINK', 'SECURED'],
+    ];
+    const fmt = arr => arr.map(([k,v]) => `▸ ${k.padEnd(9)} ${v}`).join('\n');
+    diagLeft.textContent = fmt(lines);
+    diagRight.textContent = [
+      '░░░ BROADCAST ░░░',
+      `NODE   ${randHex(2)}:${randHex(2)}`,
+      `REGION MY-01`,
+      `SIGNAL ${Math.floor(Math.random()*20)+80}%`,
+      `SYNC   NOMINAL`,
+      `STREAM ACTIVE`,
+      `MEDIA  READY`,
+      `PING   ${Math.floor(Math.random()*20)+3}ms`,
+    ].join('\n');
+  }
+
+  function runSequence() {
+    buildHexMatrix();
+    buildDiag();
+    sequence.classList.add('active');
+
+    const steps = [
+      { t: 0, render: () => {
+          const vipLine = CONFIG.vip
+            ? `<div class="cp-sub" style="font-size:14px; letter-spacing:6px; color:var(--cp-yellow); margin-top:4px;">▸ ${CONFIG.vip.toUpperCase()} ◂</div>`
+            : '';
+          seqContent.innerHTML = `
+            <div class="cp-label">IDENTITY VERIFIED // CLEARANCE CONFIRMED</div>
+            <div class="access-text glitch-text" data-text="AUTHORIZED">AUTHORIZED</div>
+            ${vipLine}
+            <div class="cp-sub"><span class="dim">CLEARANCE</span> TIER-9 // <span class="dim">SESSION</span> ${randHex(4)}-${randHex(4)}</div>`;
+          glitchEl.classList.add('on');
+          setTimeout(() => glitchEl.classList.remove('on'), 400);
+          beep(1200, 0.1, 'square', 0.12);
+          setTimeout(() => beep(1600, 0.08, 'square', 0.1), 120);
+      }},
+      { t: 1400, render: () => {
+          seqContent.innerHTML = `
+            <div class="cp-label">LAUNCH SEQUENCE // T-MINUS</div>
+            <div class="countdown glitch-text" data-text="3">3</div>
+            <div class="cp-sub">INITIALIZING BROADCAST :: SYNC 33%</div>`;
+          beep(520, 0.15, 'sine', 0.1); beep(260, 0.08, 'square', 0.05);
+      }},
+      { t: 2400, render: () => {
+          seqContent.innerHTML = `
+            <div class="cp-label">LAUNCH SEQUENCE // T-MINUS</div>
+            <div class="countdown glitch-text" data-text="2">2</div>
+            <div class="cp-sub">SECURING CHANNEL :: SYNC 66%</div>`;
+          beep(660, 0.15, 'sine', 0.1); beep(330, 0.08, 'square', 0.05);
+      }},
+      { t: 3400, render: () => {
+          seqContent.innerHTML = `
+            <div class="cp-label">LAUNCH SEQUENCE // T-MINUS</div>
+            <div class="countdown glitch-text" data-text="1">1</div>
+            <div class="cp-sub">TRANSMISSION READY :: SYNC 99%</div>`;
+          beep(880, 0.15, 'sine', 0.1); beep(440, 0.08, 'square', 0.05);
+      }},
+      { t: 4400, render: () => {
+          seqContent.innerHTML = `
+            <div class="cp-label">// CEREMONY COMMENCED //</div>
+            <div class="launch-text glitch-text" data-text="OFFICIALLY LAUNCHED">OFFICIALLY LAUNCHED</div>
+            <div class="cp-sub">▸ BROADCAST NOW LIVE ◂</div>`;
+          boom();
+          swoosh(400, 2000, 0.8, 0.1);
+          flash.classList.add('on');
+          setTimeout(() => flash.classList.remove('on'), 400);
+          glitchEl.classList.add('on');
+          setTimeout(() => glitchEl.classList.remove('on'), 500);
+      }},
+      { t: 5600, render: () => {
+          openCinema();
+          setTimeout(() => sequence.classList.remove('active'), 600);
+      }}
+    ];
+    steps.forEach(s => setTimeout(s.render, s.t));
+  }
+
+  // Cinema
+  let cinemaInterval = null;
+  // ================ CONFIG FROM QUERY PARAMS ================
+  const params = new URLSearchParams(location.search);
+  function extractYouTubeId(s) {
+    if (!s) return null;
+    s = s.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+    const m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+  const CONFIG = {
+    videoId:  extractYouTubeId(params.get('v')) || 'aqz-KE-bpKQ',
+    title:    params.get('title')    || 'BIOMETRIC LAUNCH SEQUENCE',
+    subtitle: params.get('subtitle') || 'AUTHORIZED PERSONNEL ONLY',
+    vip:      params.get('vip')      || '',
+    event:    params.get('event')    || '',
+    org:      params.get('org')      || 'LAUNCH.OS v2.6.1'
+  };
+
+  // Apply config to UI
+  (function applyConfig() {
+    const titleEl = document.querySelector('.title');
+    if (titleEl) {
+      titleEl.innerHTML = `${CONFIG.title}<span class="sub">${CONFIG.subtitle}</span>`;
+    }
+    document.getElementById('cinemaHudBL').textContent = CONFIG.org;
+    if (CONFIG.event) {
+      document.getElementById('cinemaHudTL').textContent = `◉ ${CONFIG.event.toUpperCase()} // LIVE`;
+    }
+    document.title = `${CONFIG.title} // LAUNCH`;
+  })();
+
+  // ================ YOUTUBE IFRAME API ================
+  let ytPlayer = null;
+  let ytReady = false;
+  const ytTag = document.createElement('script');
+  ytTag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(ytTag);
+
+  let endedWatcher = null;
+  window.onYouTubeIframeAPIReady = function () {
+    ytPlayer = new YT.Player('player', {
+      videoId: CONFIG.videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        rel: 0,
+        modestbranding: 1,
+        playsinline: 1,
+        iv_load_policy: 3,
+        fs: 0,
+        disablekb: 1,
+        cc_load_policy: 0,
+        showinfo: 0
+      },
+      events: {
+        onReady: () => { ytReady = true; },
+        onStateChange: (e) => {
+          // If somehow reaches ENDED (0), pause at last frame instead of closing
+          if (e.data === 0) {
+            try { ytPlayer.pauseVideo(); } catch (err) {}
+          }
+        }
+      }
+    });
+  };
+
+  // Poll near-end: pause at last frame so the ending stays visible
+  // (and we beat YouTube's end-screen cards which appear after ENDED).
+  function startEndWatcher() {
+    stopEndWatcher();
+    endedWatcher = setInterval(() => {
+      if (!ytPlayer || !ytPlayer.getCurrentTime || !ytPlayer.getDuration) return;
+      try {
+        const cur = ytPlayer.getCurrentTime();
+        const dur = ytPlayer.getDuration();
+        if (dur > 0 && cur > 0 && (dur - cur) < 0.6) {
+          ytPlayer.pauseVideo();
+          stopEndWatcher();
+        }
+      } catch (e) {}
+    }, 250);
+  }
+  function stopEndWatcher() {
+    if (endedWatcher) { clearInterval(endedWatcher); endedWatcher = null; }
+  }
+
+  const cinemaTime = document.getElementById('cinemaTime');
+  const ytWrap = document.getElementById('ytWrap');
+  function openCinema() {
+    cinema.classList.add('active');
+    ytWrap.classList.remove('reveal');
+    if (ytReady && ytPlayer && ytPlayer.playVideo) {
+      try { ytPlayer.unMute && ytPlayer.unMute(); ytPlayer.playVideo(); } catch (e) {}
+    }
+    // Reveal video area (fade out top mask) after YouTube's title overlay clears
+    setTimeout(() => ytWrap.classList.add('reveal'), 6000);
+    startEndWatcher();
+    let t = 0;
+    cinemaInterval = setInterval(() => {
+      t++;
+      const m = String(Math.floor(t/60)).padStart(2,'0');
+      const s = String(t%60).padStart(2,'0');
+      cinemaTime.textContent = `${m}:${s}`;
+    }, 1000);
+  }
+
+  function closeCinema() {
+    cinema.classList.remove('active');
+    if (ytReady && ytPlayer && ytPlayer.stopVideo) {
+      try { ytPlayer.stopVideo(); } catch (e) {}
+    }
+    stopEndWatcher();
+    clearInterval(cinemaInterval);
+    launching = false;
+    progBar.style.strokeDashoffset = CIRC;
+    statusLine1.textContent = 'PLACE INDEX FINGER ON SCANNER';
+    statusLine2.textContent = 'HOLD STEADY FOR 3.0s TO INITIATE';
+  }
+
+  document.getElementById('closeCinema').addEventListener('click', closeCinema);
+
+  document.getElementById('abortBtn').addEventListener('click', () => {
+    if (launching) {
+      closeCinema();
+      sequence.classList.remove('active');
+    } else {
+      pressEnd();
+    }
+    beep(180, 0.3, 'sawtooth', 0.08);
+    statusLine1.textContent = 'SEQUENCE ABORTED';
+    statusLine2.textContent = 'SYSTEM STANDING BY';
+    setTimeout(() => {
+      statusLine1.textContent = 'PLACE INDEX FINGER ON SCANNER';
+      statusLine2.textContent = 'HOLD STEADY FOR 3.0s TO INITIATE';
+    }, 2500);
+  });
+
+  // Keyboard: Escape aborts, F toggles fullscreen
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (cinema.classList.contains('active')) closeCinema();
+      else if (launching) { sequence.classList.remove('active'); launching = false; }
+    } else if (e.key === 'f' || e.key === 'F') {
+      toggleFullscreen();
+    }
+  });
+
+  // ================ FULLSCREEN ================
+  const fsPrompt = document.getElementById('fsPrompt');
+  const fsToggle = document.getElementById('fsToggle');
+  const fsToggleLabel = document.getElementById('fsToggleLabel');
+  const FS_SKIP_KEY = 'vip-launch-fs-skipped';
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function enterFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) req.call(el).catch(() => {});
+  }
+  function exitFullscreen() {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit && isFullscreen()) exit.call(document).catch(() => {});
+  }
+  function toggleFullscreen() {
+    isFullscreen() ? exitFullscreen() : enterFullscreen();
+  }
+
+  function updateFsUI() {
+    const fs = isFullscreen();
+    document.body.classList.toggle('is-fullscreen', fs);
+    fsToggle.title = fs ? 'Exit Fullscreen (F or Esc)' : 'Enter Fullscreen (F)';
+    fsToggleLabel.textContent = 'FULL SCREEN';
+    if (fs) {
+      fsPrompt.classList.remove('show');
+    } else if (!sessionStorage.getItem(FS_SKIP_KEY)) {
+      fsPrompt.classList.add('show');
+    }
+  }
+
+  document.getElementById('fsEnterBtn').addEventListener('click', () => {
+    enterFullscreen();
+    fsPrompt.classList.remove('show');
+  });
+  document.getElementById('fsSkipBtn').addEventListener('click', () => {
+    sessionStorage.setItem(FS_SKIP_KEY, '1');
+    fsPrompt.classList.remove('show');
+  });
+  fsToggle.addEventListener('click', toggleFullscreen);
+
+  document.addEventListener('fullscreenchange', updateFsUI);
+  document.addEventListener('webkitfullscreenchange', updateFsUI);
+
+  // Show prompt on load unless user already skipped this session
+  setTimeout(() => {
+    if (!isFullscreen() && !sessionStorage.getItem(FS_SKIP_KEY)) {
+      fsPrompt.classList.add('show');
+    }
+  }, 600);
+
+</script>
+</body>
+</html>
