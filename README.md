@@ -4,7 +4,7 @@ A futuristic biometric launch sequence for official ceremonies, school events, a
 
 Built because the humble YouTube "play" button does no justice to a proper ceremonial launch.
 
-**Live demo:** https://ceremony-2uh.pages.dev
+**Live demo:** https://ceremony.zafranudin.my
 
 ## What It Does
 
